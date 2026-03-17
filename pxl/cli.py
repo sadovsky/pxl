@@ -30,7 +30,7 @@ def cli():
 )
 @click.option(
     "--scale",
-    default=16,
+    default=1,
     show_default=True,
     type=int,
     help="Physical pixels per grid cell in the exported PNG.",
@@ -113,7 +113,7 @@ def generate(description, size, output, scale, no_preview, model, save_json):
 )
 @click.option(
     "--scale",
-    default=16,
+    default=1,
     show_default=True,
     type=int,
     help="Physical pixels per grid cell in the exported image.",
