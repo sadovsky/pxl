@@ -151,7 +151,7 @@ def generate_animation_frames(
     width: int = 16,
     height: int = 16,
     n_frames: int = 4,
-    model: str = "claude-3-5-haiku-20241022",
+    model: str = "claude-haiku-4-5-20251001",
     max_retries: int = 2,
 ) -> list[list[list[str]]]:
     client = _get_client()
@@ -195,7 +195,7 @@ def generate_pixel_grid(
     description: str,
     width: int = 16,
     height: int = 16,
-    model: str = "claude-3-5-haiku-20241022",
+    model: str = "claude-haiku-4-5-20251001",
     max_retries: int = 2,
 ) -> list[list[str]]:
     client = _get_client()

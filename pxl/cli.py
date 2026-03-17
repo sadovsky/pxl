@@ -43,9 +43,9 @@ def cli():
 )
 @click.option(
     "--model",
-    default="claude-3-5-haiku-20241022",
+    default="claude-haiku-4-5-20251001",
     show_default=True,
-    help="Claude model to use (e.g. claude-3-5-sonnet-20241022).",
+    help="Claude model to use (e.g. claude-sonnet-4-6).",
 )
 @click.option(
     "--json", "save_json",
@@ -151,7 +151,7 @@ def generate(description, size, output, scale, no_preview, model, save_json):
 )
 @click.option(
     "--model",
-    default="claude-3-5-haiku-20241022",
+    default="claude-haiku-4-5-20251001",
     show_default=True,
     help="Claude model to use.",
 )
