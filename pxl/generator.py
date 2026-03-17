@@ -48,15 +48,29 @@ def _build_user_message(description: str, width: int, height: int) -> str:
     )
 
 
+def _extract_json_object(text: str) -> str:
+    """Return the first balanced {...} substring found in text."""
+    start = text.find("{")
+    if start == -1:
+        return text
+    depth = 0
+    for i, ch in enumerate(text[start:], start):
+        if ch == "{":
+            depth += 1
+        elif ch == "}":
+            depth -= 1
+            if depth == 0:
+                return text[start : i + 1]
+    return text[start:]
+
+
 def _parse_response(raw: str) -> dict:
     # Strip potential markdown code fences despite instructions
     fence_match = re.search(r"```(?:json)?\s*(\{.*?\})\s*```", raw, re.DOTALL)
     if fence_match:
         raw = fence_match.group(1)
     else:
-        brace_match = re.search(r"\{.*\}", raw, re.DOTALL)
-        if brace_match:
-            raw = brace_match.group(0)
+        raw = _extract_json_object(raw)
     return json.loads(raw)
 
 
@@ -87,14 +101,21 @@ def generate_pixel_grid(
     max_tokens = max(1024, width * height * 12)
 
     for attempt in range(max_retries + 1):
-        response = client.messages.create(
-            model=model,
-            max_tokens=max_tokens,
-            system=SYSTEM_PROMPT,
-            messages=[
-                {"role": "user", "content": _build_user_message(description, width, height)}
-            ],
-        )
+        try:
+            response = client.messages.create(
+                model=model,
+                max_tokens=max_tokens,
+                system=SYSTEM_PROMPT,
+                messages=[
+                    {"role": "user", "content": _build_user_message(description, width, height)}
+                ],
+            )
+        except anthropic.APIStatusError as exc:
+            raise click.ClickException(f"API error {exc.status_code}: {exc.message}")
+        except anthropic.APIConnectionError:
+            raise click.ClickException("Network error: could not reach the Anthropic API.")
+        except anthropic.RateLimitError:
+            raise click.ClickException("Rate limit reached. Wait a moment and try again.")
 
         raw = response.content[0].text.strip()
 

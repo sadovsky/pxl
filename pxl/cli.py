@@ -1,3 +1,4 @@
+import json
 import re
 from pathlib import Path
 
@@ -43,10 +44,16 @@ def cli():
 @click.option(
     "--model",
     default="claude-3-5-haiku-20241022",
-    hidden=True,
-    help="Claude model to use.",
+    show_default=True,
+    help="Claude model to use (e.g. claude-3-5-sonnet-20241022).",
 )
-def generate(description, size, output, scale, no_preview, model):
+@click.option(
+    "--json", "save_json",
+    default=None,
+    metavar="FILE",
+    help="Also save the pixel grid as a JSON file.",
+)
+def generate(description, size, output, scale, no_preview, model, save_json):
     """Generate pixel art from a text DESCRIPTION.
 
     \b
@@ -75,6 +82,11 @@ def generate(description, size, output, scale, no_preview, model):
 
     exporter.save_png(pixels, output, scale=scale)
     click.echo(click.style(f"Saved → {output}  ({width * scale}×{height * scale}px)", fg="green"))
+
+    if save_json:
+        data = {"width": width, "height": height, "pixels": pixels}
+        Path(save_json).write_text(json.dumps(data, indent=2))
+        click.echo(click.style(f"Saved → {save_json}  (JSON grid)", fg="green"))
 
 
 def _parse_size(size_str: str) -> tuple[int, int]:

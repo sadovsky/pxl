@@ -21,6 +21,7 @@ def save_png(
     height = len(pixels)
     width = len(pixels[0]) if pixels else 0
 
+    Path(output_path).parent.mkdir(parents=True, exist_ok=True)
     img = Image.new("RGBA", (width * scale, height * scale))
     draw = ImageDraw.Draw(img)
 

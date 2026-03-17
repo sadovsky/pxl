@@ -19,7 +19,7 @@ def print_preview(pixels: list[list[str]]) -> None:
 
     for row_idx in range(0, height, 2):
         top_row = pixels[row_idx]
-        bot_row = pixels[row_idx + 1] if row_idx + 1 < height else ["#000000"] * width
+        bot_row = pixels[row_idx + 1] if row_idx + 1 < height else top_row
 
         parts = []
         for col_idx in range(width):
