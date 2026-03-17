@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from PIL import Image
+from PIL import Image, ImageDraw
 
 from pxl.utils import hex_to_rgb
 
@@ -22,6 +22,7 @@ def save_png(
     width = len(pixels[0]) if pixels else 0
 
     img = Image.new("RGBA", (width * scale, height * scale))
+    draw = ImageDraw.Draw(img)
 
     for row_idx, row in enumerate(pixels):
         for col_idx, hex_color in enumerate(row):
@@ -31,8 +32,6 @@ def save_png(
             color = (r, g, b, alpha)
             x0 = col_idx * scale
             y0 = row_idx * scale
-            for dy in range(scale):
-                for dx in range(scale):
-                    img.putpixel((x0 + dx, y0 + dy), color)
+            draw.rectangle([(x0, y0), (x0 + scale - 1, y0 + scale - 1)], fill=color)
 
     img.save(str(output_path), "PNG")
