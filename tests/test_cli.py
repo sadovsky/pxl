@@ -138,3 +138,110 @@ def test_generate_default_output_slug():
     assert result.exit_code == 0
     call_path = str(mock_save.call_args[0][1])
     assert call_path == "hello-world.png"
+
+
+# --- animate command ---
+
+FAKE_FRAMES = [FAKE_GRID, FAKE_GRID, FAKE_GRID, FAKE_GRID]  # 4 identical frames
+
+
+def _run_animate(args, mock_frames=FAKE_FRAMES):
+    runner = CliRunner()
+    with runner.isolated_filesystem():
+        with patch("pxl.generator.generate_animation_frames", return_value=mock_frames), \
+             patch("pxl.renderer.print_preview") as mock_preview, \
+             patch("pxl.exporter.save_gif") as mock_gif, \
+             patch("pxl.exporter.save_apng") as mock_apng, \
+             patch("pxl.exporter.save_sprite_sheet") as mock_sheet:
+            result = runner.invoke(cli, ["animate"] + args)
+    return result, mock_preview, mock_gif, mock_apng, mock_sheet
+
+
+def test_animate_basic_success():
+    result, _, mock_gif, _, _ = _run_animate(["a walking character", "--no-preview"])
+    assert result.exit_code == 0, result.output
+    assert "Saved" in result.output
+    mock_gif.assert_called_once()
+
+
+def test_animate_calls_preview_by_default():
+    result, mock_preview, _, _, _ = _run_animate(["a walking character"])
+    assert result.exit_code == 0
+    assert mock_preview.call_count == len(FAKE_FRAMES)
+
+
+def test_animate_no_preview_skips_renderer():
+    result, mock_preview, _, _, _ = _run_animate(["a walking character", "--no-preview"])
+    assert result.exit_code == 0
+    mock_preview.assert_not_called()
+
+
+def test_animate_default_format_is_gif():
+    result, _, mock_gif, mock_apng, _ = _run_animate(["a walking character", "--no-preview"])
+    assert result.exit_code == 0
+    mock_gif.assert_called_once()
+    mock_apng.assert_not_called()
+
+
+def test_animate_apng_format():
+    result, _, mock_gif, mock_apng, _ = _run_animate(
+        ["a spinning coin", "--no-preview", "--format", "apng"]
+    )
+    assert result.exit_code == 0
+    mock_apng.assert_called_once()
+    mock_gif.assert_not_called()
+
+
+def test_animate_default_output_slug_gif():
+    result, _, mock_gif, _, _ = _run_animate(["hello world", "--no-preview"])
+    assert result.exit_code == 0
+    call_path = str(mock_gif.call_args[0][1])
+    assert call_path == "hello-world.gif"
+
+
+def test_animate_default_output_slug_apng():
+    result, _, _, mock_apng, _ = _run_animate(
+        ["hello world", "--no-preview", "--format", "apng"]
+    )
+    assert result.exit_code == 0
+    call_path = str(mock_apng.call_args[0][1])
+    assert call_path == "hello-world.apng"
+
+
+def test_animate_custom_output():
+    result, _, mock_gif, _, _ = _run_animate(
+        ["a sprite", "--no-preview", "-o", "custom.gif"]
+    )
+    assert result.exit_code == 0
+    call_path = str(mock_gif.call_args[0][1])
+    assert call_path == "custom.gif"
+
+
+def test_animate_saves_sheet():
+    result, _, _, _, mock_sheet = _run_animate(
+        ["a sprite", "--no-preview", "--sheet", "sheet.png"]
+    )
+    assert result.exit_code == 0
+    mock_sheet.assert_called_once()
+    call_path = str(mock_sheet.call_args[0][1])
+    assert call_path == "sheet.png"
+
+
+def test_animate_no_sheet_by_default():
+    result, _, _, _, mock_sheet = _run_animate(["a sprite", "--no-preview"])
+    assert result.exit_code == 0
+    mock_sheet.assert_not_called()
+
+
+def test_animate_invalid_size():
+    result, _, _, _, _ = _run_animate(["a sprite", "--size", "bad"])
+    assert result.exit_code != 0
+    assert "WxH" in result.output
+
+
+def test_animate_custom_fps_passed_through():
+    result, _, mock_gif, _, _ = _run_animate(
+        ["a sprite", "--no-preview", "--fps", "12"]
+    )
+    assert result.exit_code == 0
+    assert mock_gif.call_args[1]["fps"] == 12

@@ -89,6 +89,108 @@ def _validate_grid(data: dict, expected_width: int, expected_height: int) -> Non
                 raise ValueError(f"Invalid color at [{i}][{j}]: {color!r}")
 
 
+ANIMATION_SYSTEM_PROMPT = """\
+You are a pixel art animator. When given a description and a frame count, you respond ONLY with a \
+JSON object — no markdown fences, no explanation, no text before or after.
+
+The JSON object must have exactly this shape:
+{
+  "width": <integer>,
+  "height": <integer>,
+  "frame_count": <integer>,
+  "frames": [
+    [["#RRGGBB", "#RRGGBB", ...], ...],
+    [["#RRGGBB", "#RRGGBB", ...], ...],
+    ...
+  ]
+}
+
+Rules:
+- frames is an array of exactly `frame_count` grids.
+- Each grid is an array of exactly `height` arrays, each containing exactly `width` hex color strings.
+- Each color is exactly 7 characters: a # followed by 6 uppercase hex digits (e.g. "#FF0000").
+- Use "#000000" for transparent/background pixels.
+- Use the SAME color palette across ALL frames — the character/object must look consistent.
+- Keep the same silhouette and proportions in every frame.
+- Each frame should show a clear animation step (e.g. walk cycle, idle bob, spin rotation).
+- The animation must loop smoothly: the last frame transitions naturally back to the first.
+- Never include comments, trailing commas, or any non-JSON text in your response.\
+"""
+
+
+def _validate_animation(
+    data: dict,
+    expected_width: int,
+    expected_height: int,
+    expected_frames: int,
+) -> None:
+    frames = data.get("frames")
+    if not isinstance(frames, list):
+        raise ValueError("'frames' key missing or not a list")
+    if len(frames) != expected_frames:
+        raise ValueError(f"Expected {expected_frames} frames, got {len(frames)}")
+    for f_idx, frame in enumerate(frames):
+        if not isinstance(frame, list) or len(frame) != expected_height:
+            got = len(frame) if isinstance(frame, list) else "non-list"
+            raise ValueError(f"Frame {f_idx} has {got} rows, expected {expected_height}")
+        for i, row in enumerate(frame):
+            if not isinstance(row, list) or len(row) != expected_width:
+                got = len(row) if isinstance(row, list) else "non-list"
+                raise ValueError(
+                    f"Frame {f_idx} row {i} has {got} pixels, expected {expected_width}"
+                )
+            for j, color in enumerate(row):
+                if not isinstance(color, str) or not is_valid_hex_color(color):
+                    raise ValueError(
+                        f"Invalid color at frame {f_idx}[{i}][{j}]: {color!r}"
+                    )
+
+
+def generate_animation_frames(
+    description: str,
+    width: int = 16,
+    height: int = 16,
+    n_frames: int = 4,
+    model: str = "claude-3-5-haiku-20241022",
+    max_retries: int = 2,
+) -> list[list[list[str]]]:
+    client = _get_client()
+    max_tokens = max(2048, width * height * n_frames * 12)
+    user_msg = (
+        f"Create a {n_frames}-frame animation of: {description}\n\n"
+        f"Each frame must be exactly {width} columns wide and {height} rows tall.\n"
+        f"frame_count must be exactly {n_frames}."
+    )
+
+    for attempt in range(max_retries + 1):
+        try:
+            response = client.messages.create(
+                model=model,
+                max_tokens=max_tokens,
+                system=ANIMATION_SYSTEM_PROMPT,
+                messages=[{"role": "user", "content": user_msg}],
+            )
+        except anthropic.APIStatusError as exc:
+            raise click.ClickException(f"API error {exc.status_code}: {exc.message}")
+        except anthropic.APIConnectionError:
+            raise click.ClickException("Network error: could not reach the Anthropic API.")
+        except anthropic.RateLimitError:
+            raise click.ClickException("Rate limit reached. Wait a moment and try again.")
+
+        raw = response.content[0].text.strip()
+
+        try:
+            data = _parse_response(raw)
+            _validate_animation(data, width, height, n_frames)
+            return data["frames"]
+        except (ValueError, json.JSONDecodeError, KeyError) as exc:
+            if attempt == max_retries:
+                raise click.ClickException(
+                    f"Claude returned invalid animation data after {max_retries + 1} attempts.\n"
+                    f"Last error: {exc}\nRaw response (first 500 chars):\n{raw[:500]}"
+                )
+
+
 def generate_pixel_grid(
     description: str,
     width: int = 16,

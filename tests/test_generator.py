@@ -1,7 +1,7 @@
 import json
 import pytest
 
-from pxl.generator import _parse_response, _validate_grid
+from pxl.generator import _parse_response, _validate_grid, _validate_animation
 
 
 # --- _parse_response ---
@@ -79,3 +79,45 @@ def test_validate_grid_short_hex_rejected():
     data = {"pixels": [["#FFF"]]}
     with pytest.raises(ValueError, match="Invalid color"):
         _validate_grid(data, expected_width=1, expected_height=1)
+
+
+# --- _validate_animation ---
+
+def _make_animation(n_frames: int, rows: int, cols: int, color: str = "#ABCDEF") -> dict:
+    frames = [[[color] * cols for _ in range(rows)] for _ in range(n_frames)]
+    return {"width": cols, "height": rows, "frame_count": n_frames, "frames": frames}
+
+
+def test_validate_animation_valid():
+    data = _make_animation(4, 2, 3)
+    _validate_animation(data, expected_width=3, expected_height=2, expected_frames=4)
+
+
+def test_validate_animation_missing_frames_key():
+    with pytest.raises(ValueError, match="'frames' key missing"):
+        _validate_animation({"width": 2}, expected_width=2, expected_height=2, expected_frames=3)
+
+
+def test_validate_animation_wrong_frame_count():
+    data = _make_animation(3, 2, 2)
+    with pytest.raises(ValueError, match="Expected 4 frames"):
+        _validate_animation(data, expected_width=2, expected_height=2, expected_frames=4)
+
+
+def test_validate_animation_frame_wrong_row_count():
+    data = _make_animation(2, 3, 2)  # 3 rows per frame
+    with pytest.raises(ValueError, match="Frame 0"):
+        _validate_animation(data, expected_width=2, expected_height=2, expected_frames=2)
+
+
+def test_validate_animation_frame_wrong_col_count():
+    data = _make_animation(2, 2, 3)  # 3 cols per row
+    with pytest.raises(ValueError, match="row 0"):
+        _validate_animation(data, expected_width=2, expected_height=2, expected_frames=2)
+
+
+def test_validate_animation_bad_color_in_frame():
+    data = _make_animation(2, 1, 1)
+    data["frames"][1][0][0] = "bad"
+    with pytest.raises(ValueError, match="Invalid color at frame 1"):
+        _validate_animation(data, expected_width=1, expected_height=1, expected_frames=2)
